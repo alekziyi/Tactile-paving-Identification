@@ -1,66 +1,42 @@
+import socket
 import cv2
-import asyncio
-from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
+import numpy as np
+import time
+from threading import Thread
 
-class VideoStream(VideoStreamTrack):
-    def __init__(self, video_source):
-        self.cap = cv2.VideoCapture(video_source)
-        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.fps = int(self.cap.get(cv2.CAP_PROP_FPS))
-        self.frame_count = 0
+PACKAGE_SIZE=65000
 
-    async def recv(self):
+class VideoReporter(Thread):
+    def __init__(self):
+        Thread.__init__(self)
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect(('localhost', 12000))
+        self.cap = cv2.VideoCapture(0)
+        self.num=0
+        self.center=None
+    def send(self,img: np.ndarray):
+        n=img.size//PACKAGE_SIZE
+        self.client_socket.send(n.to_bytes(4))
+        self.client_socket.recv(1)
+        for i in range(n):
+            self.client_socket.send(img.data[i*PACKAGE_SIZE:(i+1)*PACKAGE_SIZE])
+            self.client_socket.recv(1)
+        self.client_socket.send(img.data[n * PACKAGE_SIZE:])
+        self.client_socket.recv(1)
+    def receive(self):
+        # self.center=eval(self.client_socket.recv(50).decode('utf-8'))
+        # self.client_socket.send(b'1')
+        pass
+    def run(self):
         while True:
-            ret, frame = self.cap.read()
-            if not ret:
-                break
-            self.frame_count += 1
+            ret,img=self.cap.read()
+            if ret:
+                self.send(img)
+                self.receive()
+            else:
+                time.sleep(1)
 
-            pts, time_base = self.frame_count * 100, 1 / self.fps
 
-            pts, time_base = self.frame_count * 100, 1 / self.fps
-            pts, time_base = int(pts), round(time_base, 3)
-
-            video_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img = cv2.imencode('.png', video_frame)[1].tobytes()
-
-            pts, time_base = self.frame_count * 100, 1 / self.fps
-
-            pts, time_base = int(pts), round(time_base, 3)
-            await asyncio.sleep(time_base)
-
-            pts, time_base = int(pts), round(time_base, 3)
-            pts, time_base = int(pts), round(time_base, 3)
-            pts, time_base = int(pts), round(time_base, 3)
-
-            pts, time_base = int(pts), round(time_base, 3)
-            yield RTCVideoFrame(width=self.width, height=self.height, pts=pts, time_base=time_base, data=img)
-
-async def send():
-    # Replace 'your_stun_server' with the actual STUN server address
-    pc = RTCPeerConnection(configuration={"iceServers": [{"urls": "stun:your_stun_server"}]})
-    pc_id = "video"
-    pcs.add(pc_id, pc)
-
-    player = VideoStream(video_source=0)
-    await pc.addTrack(player)
-
-    # Replace 'your_signaling_server' with the actual signaling server address
-    offer = await pc.createOffer()
-    await pc.setLocalDescription(offer)
-    offer_sdp = pc.localDescription.sdp
-    print(offer_sdp)
-
-    # Send offer_sdp to the remote peer, for example, through a signaling server
-
-    # Once the remote peer responds with answer_sdp, set it as the remote description
-    answer_sdp = input("Paste answer SDP here: ")
-    await pc.setRemoteDescription(RTCSessionDescription(sdp=answer_sdp, type="answer"))
-
-    print("ICE gathering complete, press Ctrl+C to exit")
-
-    while True:
-        await asyncio.sleep(1)
-
-asyncio.run(send())
+if __name__=='__main__':
+    video_reporter=VideoReporter()
+    video_reporter.start()
