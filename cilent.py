@@ -1,33 +1,66 @@
 import cv2
-import socket
-import struct
-import pickle
+import asyncio
+from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 
+class VideoStream(VideoStreamTrack):
+    def __init__(self, video_source):
+        self.cap = cv2.VideoCapture(video_source)
+        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.fps = int(self.cap.get(cv2.CAP_PROP_FPS))
+        self.frame_count = 0
 
-def send_image(addr,img):
-    udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    async def recv(self):
+        while True:
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+            self.frame_count += 1
 
-    # 将图像转换为字符串
-    img_str = pickle.dumps(img)
+            pts, time_base = self.frame_count * 100, 1 / self.fps
 
-    # 设置分块大小
-    chunk_size = 65000
+            pts, time_base = self.frame_count * 100, 1 / self.fps
+            pts, time_base = int(pts), round(time_base, 3)
 
-    # 获取图像大小并发送
-    img_size = struct.pack("!I", len(img_str))
-    udp_socket.sendto(img_size, addr)
+            video_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = cv2.imencode('.png', video_frame)[1].tobytes()
 
-    # 分块发送图像数据
-    for i in range(0, len(img_str), chunk_size):
-        udp_socket.sendto(img_str[i:i + chunk_size], addr)
-        #udp_socket.recvfrom(4)
+            pts, time_base = self.frame_count * 100, 1 / self.fps
 
-    udp_socket.close()
+            pts, time_base = int(pts), round(time_base, 3)
+            await asyncio.sleep(time_base)
 
+            pts, time_base = int(pts), round(time_base, 3)
+            pts, time_base = int(pts), round(time_base, 3)
+            pts, time_base = int(pts), round(time_base, 3)
 
-if __name__ == "__main__":
-    server_address = ("127.0.0.1", 7777)
-    cap=cv2.VideoCapture(0)
-    ret,img=cap.read()
-    img=cv2.resize(img,(600,400))
-    send_image(server_address, img)
+            pts, time_base = int(pts), round(time_base, 3)
+            yield RTCVideoFrame(width=self.width, height=self.height, pts=pts, time_base=time_base, data=img)
+
+async def send():
+    # Replace 'your_stun_server' with the actual STUN server address
+    pc = RTCPeerConnection(configuration={"iceServers": [{"urls": "stun:your_stun_server"}]})
+    pc_id = "video"
+    pcs.add(pc_id, pc)
+
+    player = VideoStream(video_source=0)
+    await pc.addTrack(player)
+
+    # Replace 'your_signaling_server' with the actual signaling server address
+    offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
+    offer_sdp = pc.localDescription.sdp
+    print(offer_sdp)
+
+    # Send offer_sdp to the remote peer, for example, through a signaling server
+
+    # Once the remote peer responds with answer_sdp, set it as the remote description
+    answer_sdp = input("Paste answer SDP here: ")
+    await pc.setRemoteDescription(RTCSessionDescription(sdp=answer_sdp, type="answer"))
+
+    print("ICE gathering complete, press Ctrl+C to exit")
+
+    while True:
+        await asyncio.sleep(1)
+
+asyncio.run(send())

@@ -1,37 +1,36 @@
 import cv2
-import socket
-import struct
-import pickle
+import asyncio
+from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 
+class VideoStream(VideoStreamTrack):
+    def __init__(self):
+        super().__init__()
+        self.frame_count = 0
 
-def receive_image(addr):
-    udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    udp_socket.bind(addr)
+    async def recv(self):
+        while True:
+            # Replace 'your_signaling_server' with the actual signaling server address
+            offer_sdp = input("Paste offer SDP here: ")
 
-    # 接收图像大小
-    img_size, _ = udp_socket.recvfrom(4)
-    img_size = struct.unpack("!I", img_size)[0]
-    print(img_size)
-    # 接收图像数据
-    img_data = b""
-    chunk_size = 65000
-    while len(img_data) < img_size:
-        chunk, _ = udp_socket.recvfrom(chunk_size)
-        img_data += chunk
-        #udp_socket.sendto('1'.encode(), addr)
+            pc = RTCPeerConnection(configuration={"iceServers": [{"urls": "stun:your_stun_server"}]})
+            pc_id = "video"
+            pcs.add(pc_id, pc)
 
-    # 将接收到的字符串转换回图像
-    img = pickle.loads(img_data)
-    print(img)
-    udp_socket.close()
+            player = VideoStream()
+            await pc.addTrack(player)
 
-    # 显示图像
-    cv2.imshow("Received Image", img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+            await pc.setRemoteDescription(RTCSessionDescription(sdp=offer_sdp, type="offer"))
 
+            answer = await pc.createAnswer()
+            await pc.setLocalDescription(answer)
+            answer_sdp = pc.localDescription.sdp
+            print(answer_sdp)
 
-if __name__ == "__main__":
-    server_address = ("127.0.0.1", 7787)
+            # Send answer_sdp back to the remote peer, for example, through a signaling server
 
-    receive_image(server_address)
+            print("ICE gathering complete, press Ctrl+C to exit")
+
+            while True:
+                await asyncio.sleep(1)
+
+asyncio.run(recv())
