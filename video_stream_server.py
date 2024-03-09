@@ -6,7 +6,7 @@ import cv2
 from deeplab import DeeplabV3
 import threading
 
-img_cache=np.zeros((480,640,3),dtype=np.uint8)
+img_cache = np.zeros((480,640,3),dtype=np.uint8)
 
 def model_process():
     deeplab = DeeplabV3(num_classes=2)
