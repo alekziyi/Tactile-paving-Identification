@@ -23,7 +23,7 @@ def cap_process():
     gameDisplay = pygame.display.set_mode((640, 480))
     pygame.camera.init()
     print(pygame.camera.list_cameras())
-    cam = pygame.camera.Camera("http://192.168.137.224:8081/")
+    cam = pygame.camera.Camera("http://192.168.137.224:8081/") # 修改为自己的摄像头地址
     cam.start()
     global img_cache
     while True:
