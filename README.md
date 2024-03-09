@@ -69,7 +69,7 @@ cam = pygame.camera.Camera("http://xxxxxxx:8081/") # 修改为自己的摄像头
 运行即可
 
 
-###常见问题
+### 常见问题
 
 1. 下载慢
 换源
